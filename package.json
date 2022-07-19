@@ -1,0 +1,46 @@
+{
+  "name": "sauce2000",
+  "version": "1.0.0",
+  "description": "A Telegram bot that helps you find the sauce.",
+  "main": "index.js",
+  "scripts": {
+    "clean": "rimraf dist && mkdirp dist",
+    "prebuild": "npm run clean",
+    "build": "tsc",
+    "start": "node dist/index.js | ./node_modules/.bin/bunyan",
+    "lint": "eslint --cache --ext .js,.ts --format=pretty ./src",
+    "lint:fix": "eslint --fix --cache --ext .js,.ts --format=pretty ./src"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:souyahia/sauce2000.git"
+  },
+  "author": "Samy Ouyahia <ouyahia.samy@yahoo.fr>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/souyahia/sauce2000/issues"
+  },
+  "homepage": "https://github.com/souyahia/sauce2000#readme",
+  "devDependencies": {
+    "@types/bunyan": "^1.8.8",
+    "@types/nconf": "^0.10.3",
+    "@types/node": "^18.0.6",
+    "@types/node-telegram-bot-api": "^0.57.1",
+    "@typescript-eslint/eslint-plugin": "^5.30.7",
+    "@typescript-eslint/parser": "^5.30.7",
+    "eslint": "^8.20.0",
+    "eslint-config-airbnb-base": "^15.0.0",
+    "eslint-config-airbnb-typescript": "^17.0.0",
+    "eslint-plugin-import": "^2.26.0",
+    "eslint-plugin-promise": "^6.0.0",
+    "mkdirp": "^1.0.4",
+    "rimraf": "^3.0.2",
+    "typescript": "^4.7.4"
+  },
+  "dependencies": {
+    "bunyan": "^1.8.15",
+    "nconf": "^0.12.0",
+    "node-telegram-bot-api": "^0.58.0",
+    "saucenao": "^0.0.2"
+  }
+}

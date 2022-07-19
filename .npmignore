@@ -1,0 +1,12 @@
+src/
+node_modules/
+.deployment
+.eslintignore
+.eslintrc.json
+.gitignore
+.npmignore
+app-config.json
+docker-entrypoint.sh
+Dockerfile
+LICENSE
+yarn-error.log
