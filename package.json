@@ -1,6 +1,6 @@
 {
   "name": "sauce2000",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A Telegram bot that helps you find the sauce.",
   "main": "index.js",
   "scripts": {
