@@ -1,10 +1,11 @@
-FROM node:16-alpine3.10
+FROM node:16-alpine3.15
 
 RUN mkdir -p /home/node/app
 
 WORKDIR /home/node/app
 
-COPY package*.json ./
+COPY package.json ./
+COPY yarn.lock ./
 
 RUN apk update && yarn install
 

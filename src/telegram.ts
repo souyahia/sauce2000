@@ -1,23 +1,29 @@
-import TelegramBot, { Message } from 'node-telegram-bot-api';
+import TelegramBot, { Message, PhotoSize } from 'node-telegram-bot-api';
 import { Logger } from './logger';
-import { getBadMentionResponse, getHelpCommandResponse } from './responses';
+import {
+  getBadMentionResponse,
+  getHelpCommandResponse, getRemainingCommandResponse,
+  getSauceNotFoundResponse,
+  getSauceResultsIntro, getTooManyRequestsResponse,
+} from './responses';
+import { SauceNAO2000 } from './sauceNAO';
 
-const HELP_CMD = '/help';
-
-export interface Sauce2000TelegramBotOptions {
-  telegramSecret: string,
-  telegramUsername: string,
+enum Command {
+  HELP = '/help',
+  REMAINING = '/remaining',
 }
 
 export class Sauce2000TelegramBot {
   private readonly telegram: TelegramBot;
-  private readonly telegramUsername: string;
   private startingTime: number;
 
-  constructor(options: Sauce2000TelegramBotOptions) {
-    Logger.info(options.telegramSecret);
-    this.telegram = new TelegramBot(options.telegramSecret, { polling: true });
-    this.telegramUsername = options.telegramUsername;
+  constructor(
+    private readonly telegramSecret: string,
+    private readonly telegramUsername: string,
+    private readonly sauce: SauceNAO2000,
+  ) {
+    this.telegram = new TelegramBot(this.telegramSecret, { polling: true });
+    Logger.info(`Sauce2000 bot created with username @${this.telegramUsername}`);
   }
 
   start(): void {
@@ -27,7 +33,7 @@ export class Sauce2000TelegramBot {
   }
 
   private onMessage(message: Message): void {
-    if (this.isNewMessage(message)) {
+    if (this.isNewMessage(message) && !this.handleCommands(message)) {
       if (message.chat.type === 'private') {
         this.onPrivateMessage(message);
       } else if (message.chat.type === 'group' || message.chat.type === 'supergroup') {
@@ -36,8 +42,23 @@ export class Sauce2000TelegramBot {
     }
   }
 
+  private handleCommands(message: Message): boolean {
+    if (!message.text) {
+      return false;
+    }
+    if (message.text.startsWith(Command.HELP)) {
+      this.onHelpCommand(message);
+      return true;
+    }
+    if (message.text.startsWith(Command.REMAINING)) {
+      this.onRemainingCommand(message);
+      return true;
+    }
+    return false;
+  }
+
   private onPrivateMessage(message: Message): void {
-    if (message.text && message.text.startsWith(HELP_CMD)) {
+    if (message.text && message.text.startsWith(Command.HELP)) {
       this.onHelpCommand(message);
     } else if (this.messageContainsPhoto(message)) {
       this.onSauceNeeded(message, message);
@@ -59,6 +80,11 @@ export class Sauce2000TelegramBot {
     this.replyToMessage(message, getHelpCommandResponse());
   }
 
+  private onRemainingCommand(message: Message): void {
+    Logger.debug(`Remaining command received : message #${message.message_id} in chat #${message.chat.id}.`);
+    this.replyToMessage(message, getRemainingCommandResponse(this.sauce.getTicketsRemaining()));
+  }
+
   private onBadMention(message: Message): void {
     Logger.debug(`Bad mention received : message #${message.message_id} in chat #${message.chat.id}.`);
     this.replyToMessage(message, getBadMentionResponse());
@@ -66,7 +92,45 @@ export class Sauce2000TelegramBot {
 
   private onSauceNeeded(messageWithPhoto: Message, replyTo: Message): void {
     Logger.debug(`Sauce asked in message #${replyTo.message_id} for photos #${messageWithPhoto.message_id} in chat #${replyTo.chat.id}.`);
-    this.replyToMessage(replyTo, 'TODO : Implement the sauce finding.');
+    const photo = this.choosePhotoForSauce(messageWithPhoto);
+    if (!this.sauce.isUp()) {
+      Logger.debug('Sauce is not up (too many requests).');
+      return this.replyToMessage(replyTo, getTooManyRequestsResponse());
+    }
+    if (this.sauce.getTicketsRemaining() === 0) {
+      Logger.debug('No Sauce Tickets remaining.');
+      return this.replyToMessage(replyTo, getRemainingCommandResponse(0));
+    }
+    this.getPhotoUrl(photo)
+      .then((photoUrl) => this.sauce.find(photoUrl))
+      .then((results) => {
+        Logger.debug(`Results found for message #${messageWithPhoto.message_id} :`, results);
+        let response = results.length === 0 ? getSauceNotFoundResponse() : getSauceResultsIntro(results.length);
+        if (results.length > 0) {
+          results.map((result) => this.sauce.format(result)).forEach((formatted) => {
+            response = `${response}\n\n${formatted}`;
+          });
+        }
+        Logger.debug(`Sending the following sauce to message #${replyTo.message_id} :`, response);
+        return this.replyToMessage(replyTo, response);
+      }).catch((err) => Logger.error(err));
+  }
+
+  private choosePhotoForSauce(messageWithPhoto: Message): PhotoSize {
+    if (!messageWithPhoto.photo) {
+      throw new Error(`Expected photos in message #${messageWithPhoto.message_id}.`);
+    }
+    return messageWithPhoto.photo.reduce((maxResPhoto, current) => {
+      if (current.width > maxResPhoto.width && current.height > maxResPhoto.height) {
+        return current;
+      }
+      return maxResPhoto;
+    });
+  }
+
+  private getPhotoUrl(photo: PhotoSize): Promise<string> {
+    return this.telegram.getFile(photo.file_id)
+      .then((file) => `https://api.telegram.org/file/bot${this.telegramSecret}/${file.file_path}`);
   }
 
   private replyToMessage(replyTo: Message, markdownText: string): void {
